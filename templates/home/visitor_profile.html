@@ -1,0 +1,270 @@
+{% extends 'base.html' %}
+{% block title %}
+    <title xmlns="http://www.w3.org/1999/html">VisitorEntry</title>
+    <style>
+
+        html, body {
+            font-family: "Poppins", sans-serif;
+            background: #e8ecf1;
+            color: black;
+        }
+
+        b {
+            color: black;
+        }
+
+        @media print {
+            .noprint {
+                display: none;
+            }
+        }
+
+        @media screen {
+            ...
+        }
+
+        .idcard-front {
+            background: white;
+            width: 450px;
+            border-radius: .2em;
+            box-shadow: 0 2.5em .9em -2em #555;
+            position: absolute;
+        }
+
+        .desc {
+            font-weight: 600;
+            position: relative;
+            width: 100%;
+            text-align: center;
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css?family=Montserrat" rel="stylesheet">
+{% endblock %}
+{% block head %}
+
+{% endblock %}
+
+{% block body %}
+
+    <div>
+        <h2 class="desc noprint">Welcome to RRSCW</h2>
+    </div>
+    <div class="container">
+        <div class="row mt-3 mb-40">
+            <div class="noprint col-md-6 col-12">
+                <div class="row">
+                    <video height="230px" width="450px"></video>
+                </div>
+                <div class="row">
+                    <div class="controls noprint ">
+                        <button type="button" id="take-photo" title="Take Photo"
+                                class="genric-btn success e-large circle"
+                                style="width: 400px;">Capture
+                        </button>
+                        <br>
+                        <p></p>
+                        <button type="button" id="delete-photo" title="Delete Photo"
+                                class="genric-btn primary e-large disabled circle " style="width:200px;">
+                            Delete
+                        </button>
+                        <button type="button" id="save-photo" title="Save Photo"
+                                class="genric-btn warning e-large disabled circle" style="width: 200px">Save
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+            <div class="col-md-6 col-12">
+                <div class="row">
+                    {% for profile in profile %}
+                        <div class="idcard-front pl-2">
+                            <div class="desc">Indian Space Research Organisation</div>
+                            <div class="desc"><b>RRSC-WEST Visitor's Pass</b></div>
+                            {% if profile.photo %}
+                                <div>
+                                    <img class="desc" src="{{ profile.photo.url }}"
+                                         style="height: 120px; width: 120px;  float: right; margin: 10px 30px;">
+                                </div>
+                            {% else %}
+                                <div class="mr-3">
+                                    <canvas id="snapshot" width="130px" height="130px"
+                                            style="float: right; width:130px; height:130px;"></canvas>
+                                    <input type="number" hidden id='pk' value={{ profile.id }}>
+                                </div>
+                            {% endif %}
+                            <p class="" id="name"><b>Name : </b>{{ profile.name }}</p>
+                            <p class=""><b>Phone : </b>{{ profile.phone }}</p>
+                            {% for schedule in schedule %}
+                                <p hidden id="id">{{ schedule.id }}</p>
+                                <p hidden id="visitor">{{ schedule.visitor_id_id }}</p>
+                                <p class=""><b>Purpose : </b> {{ schedule.purpose }}</p>
+                                <p class=""><b>Allowed Devices : </b> {{ schedule.allowed_devices }}</p>
+                                <hr>
+                                <div id="qrcode" style="float: right; margin: 10px 20px ;"></div>
+                                <b>In-Time : </b>
+                                <p class="" id="in_time">{{ schedule.in_time }}</p>
+                                <b>Out-Time : </b>
+                                <p class="" id="out_time">{{ schedule.out_time }}</p>
+                                <p><b>No. of Days : </b>{{ schedule.allowed_days }}</p>
+                                <p><b>Address : </b>{{ profile.address }}</p>
+                                <p><b>City : </b>{{ profile.city }}</p>
+                            {% endfor %}
+                        </div>
+                    {% endfor %}
+                </div>
+
+
+            </div>
+        </div>
+        <div class="row">
+            <div class="noprint">
+                <button type="button" class="genric-btn success e-large circle" style="width: 400px;" id="qr"
+                        onclick="showqr()">View-QR
+                </button>
+                <p></p>
+                <button type="button" class="genric-btn success e-large circle" style="width: 400px;"
+                        onclick="window.print()">Print
+                </button>
+                <button type="button" class="noprint" id="enter" onclick="inTimeEnter()">In Time Entry</button>
+                <button type="button" class="noprint" id="out" onclick="outTimeEnter()">Out Time Entry</button>
+            </div>
+        </div>
+
+    </div>
+
+{% endblock %}
+
+{% block script %}
+
+    <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+    <script>
+        const vid = document.querySelector('video');
+        navigator.mediaDevices.getUserMedia({video: true}) // request cam
+            .then(stream => {
+                vid.srcObject = stream; // don't use createObjectURL(MediaStream)
+                return vid.play(); // returns a Promise
+            })
+            .then(() => { // enable the button
+                const btn = document.getElementById('take-photo');
+                var snap;
+                btn.disabled = false;
+                btn.onclick = e => {
+                    snap = takeASnap();
+                };
+                const bt = document.getElementById('save-photo');
+                bt.onclick = f => {
+                    var pk = document.getElementById('pk');
+                    pk = pk.value;
+                    $.ajax({
+                        type: "POST",
+                        url: "/user/home/guard_homepage/",
+                        data: {
+                            photo: snap,
+                            pk: pk,
+                            csrfmiddlewaretoken: '{{ csrf_token }}',
+                        },
+
+                    });
+                };
+            });
+
+        function takeASnap() {
+            const canvas = document.querySelector('canvas'), // create a canvas
+                context = canvas.getContext('2d'); // get its context
+
+            var width = vid.videoWidth, // set its size to the one of the video
+                height = vid.videoHeight;
+            if (width && height) {
+
+                // Setup a canvas with the same dimensions as the video.
+                canvas.width = width;
+                canvas.height = height;
+
+                // Make a copy of the current frame in the video on the canvas.
+                context.drawImage(vid, 0, 0, width, height);
+
+                // Turn the canvas image into a dataURL that can be used as a src for our photo.
+                return canvas.toDataURL('image/png');
+            }
+        }
+
+
+        function showqr() {
+            var btn = document.getElementById('qr');
+            btn.hidden = true;
+            var data = document.getElementById('visitor').innerHTML;
+            var qrcode = new QRCode(document.getElementById("qrcode"), {
+                text: data,
+                width: 128,
+                height: 128,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+        }
+
+        function inTimeEnter() {
+            var id = document.getElementById('id').innerHTML;
+            var btn = document.getElementById('enter');
+            btn.hidden = true;
+
+            var a = document.getElementById('in_time').innerHTML;
+            var i = 0, month = "", year = "", day = "";
+
+            while (a[i] != ' ') {
+                month += a[i];
+                i++;
+            }
+            i++;
+            while (a[i] != ',') {
+                day += a[i];
+                i++;
+            }
+            i++;
+            i++;
+            while (a[i] != ',') {
+                year += a[i];
+                i++;
+            }
+
+            var current_date = new Date().getDate();
+            if (String(current_date) == day) {
+                alert('Entry Success, Print QR Now')
+                $.ajax(
+                    {
+                        type: "POST",
+                        url: '/user/in/time/enter/',
+                        data: {
+                            id: id,
+                            csrfmiddlewaretoken: '{{ csrf_token }}',
+                        },
+                    });
+            }
+            else {
+                var schedule = document.getElementById('in_time').innerHTML;
+                alert('You are scheduled for' + ' ' + schedule);
+            }
+
+
+        }
+
+        function outTimeEnter() {
+            var id = document.getElementById('id').innerHTML;
+            var btn = document.getElementById('out');
+            btn.hidden = true;
+            alert('Entry Success, Collect Id!')
+            $.ajax(
+                {
+                    type: "POST",
+                    url: '/user/out/time/enter/',
+                    data: {
+                        id: id,
+                        csrfmiddlewaretoken: '{{ csrf_token }}',
+                    },
+                });
+        }
+
+
+    </script>
+
+{% endblock %}
